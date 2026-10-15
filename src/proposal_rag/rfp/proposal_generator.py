@@ -3,7 +3,6 @@ import json
 
 from proposal_rag.generation.llm import LLM
 
-
 SYSTEM_PROMPT = """
 You are a senior technical proposal writer.
 

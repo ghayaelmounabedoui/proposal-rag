@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from proposal_rag.embeddings.local import LocalEmbedder
-from proposal_rag.ingestion.loader import load_document
 from proposal_rag.ingestion.chunker import chunk_document
+from proposal_rag.ingestion.loader import load_document
 
 
 def main() -> None:
