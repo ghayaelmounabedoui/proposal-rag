@@ -59,16 +59,19 @@ def parse_pdf_document(path: Path) -> list[DocumentBlock]:
         for pdf_block in data["blocks"]:
             paragraph_lines = []
 
-            def flush_paragraph() -> None:
-                if paragraph_lines:
+            def flush_paragraph(
+                lines: list[str] = paragraph_lines,
+                page: int = page_number,
+            ) -> None:
+                if lines:
                     blocks.append(
                         DocumentBlock(
-                            text=" ".join(paragraph_lines),
-                            page_start=page_number,
-                            page_end=page_number,
+                            text=" ".join(lines),
+                            page_start=page,
+                            page_end=page,
                         )
                     )
-                    paragraph_lines.clear()
+                    lines.clear()
 
             for line in pdf_block.get("lines", []):
                 spans = [

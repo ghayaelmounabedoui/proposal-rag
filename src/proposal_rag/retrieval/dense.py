@@ -47,6 +47,7 @@ class DenseRetriever:
             documents,
             metadatas,
             distances,
+            strict=False,
         ):
             retrieved.append(
                 RetrievalResult(

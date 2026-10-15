@@ -3,7 +3,6 @@ from pathlib import Path
 
 from proposal_rag.models import DocumentBlock
 
-
 HEADING_PATTERN = re.compile(r"^(#{1,6})\s+(.+)$")
 
 

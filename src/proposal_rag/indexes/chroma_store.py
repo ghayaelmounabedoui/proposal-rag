@@ -101,7 +101,7 @@ class ChromaStore:
             ],
         )
 
-    
+
     def list_documents(self) -> list[dict]:
         data = self.collection.get(
             include=["metadatas"]

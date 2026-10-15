@@ -1,9 +1,9 @@
 from pathlib import Path
 
-from proposal_rag.models import DocumentBlock
-from proposal_rag.ingestion.text_parser import parse_text_document
 from proposal_rag.ingestion.docx_parser import parse_docx_document
 from proposal_rag.ingestion.pdf_parser import parse_pdf_document
+from proposal_rag.ingestion.text_parser import parse_text_document
+from proposal_rag.models import DocumentBlock
 
 
 def load_document(path: str | Path) -> list[DocumentBlock]:

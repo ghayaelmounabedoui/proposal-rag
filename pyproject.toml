@@ -36,5 +36,15 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-# F = erreurs réelles (imports inutilisés, noms indéfinis...), E9 = erreurs de syntaxe.
-select = ["F", "E9"]
+# F = erreurs réelles, E/W = style pycodestyle, I = tri des imports,
+# B = bugs probables (flake8-bugbear), UP = syntaxe Python moderne.
+select = ["F", "E", "W", "I", "B", "UP"]
+
+[tool.ruff.lint.flake8-bugbear]
+# Idiome FastAPI : File(...) / Depends(...) en valeur par défaut.
+extend-immutable-calls = ["fastapi.File", "fastapi.Depends"]
+
+[tool.ruff.lint.per-file-ignores]
+# Matériel de formation et script de génération de PDF : lignes longues tolérées.
+"docs/**" = ["E501", "E741"]
+"scripts/build_pdf.py" = ["E501"]

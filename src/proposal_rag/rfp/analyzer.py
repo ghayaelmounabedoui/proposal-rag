@@ -4,11 +4,9 @@ import os
 import re
 from pathlib import Path
 
-from groq import Groq
+from groq import BadRequestError, Groq
 
 from proposal_rag.ingestion.loader import load_document
-
-from groq import BadRequestError
 
 MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 MAX_BATCH_CHARS = 10000
@@ -97,7 +95,7 @@ class RFPAnalyzer:
 
         return batches
 
-    
+
     def _analyze_batch(self, text: str) -> list[dict]:
         def call_groq(batch_text: str) -> list[dict]:
             response = self.client.chat.completions.create(
