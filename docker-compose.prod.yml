@@ -5,6 +5,9 @@
 
 services:
   backend:
+    # BACKEND_IMAGE : image publiée par la CI (ghcr.io/...-backend:sha-...).
+    # Sans cette variable, l'image est construite localement comme avant.
+    image: ${BACKEND_IMAGE:-proposal-rag-backend:local}
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -25,6 +28,7 @@ services:
     restart: unless-stopped
 
   frontend:
+    image: ${FRONTEND_IMAGE:-proposal-rag-frontend:local}
     build:
       context: .
       dockerfile: Dockerfile.frontend
