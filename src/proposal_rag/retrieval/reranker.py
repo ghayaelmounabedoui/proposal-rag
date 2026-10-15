@@ -4,7 +4,6 @@ from sentence_transformers import CrossEncoder
 
 from proposal_rag.retrieval.models import RetrievalResult
 
-
 # Modèle configurable : ms-marco est entraîné sur de l'anglais.
 # Pour des documents surtout français, définir RERANKER_MODEL
 # (ex. un cross-encoder multilingue) puis réindexer n'est pas nécessaire.
@@ -55,6 +54,7 @@ class Reranker:
             for result, score in zip(
                 results,
                 scores,
+                strict=False,
             )
         ]
 

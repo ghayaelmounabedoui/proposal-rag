@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 from proposal_rag.ingestion.chunker import chunk_document
 from proposal_rag.ingestion.text_parser import parse_text_document
 
-
 DOCUMENT = """# Sécurité
 
 ## Protection des données

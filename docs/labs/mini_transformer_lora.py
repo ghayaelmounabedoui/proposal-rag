@@ -273,7 +273,7 @@ def train_bpe(text, num_merges):
     tokens = list(text.encode("utf-8"))  # on part des 256 octets
     merges = {}
     for i in range(num_merges):
-        pairs = Counter(zip(tokens, tokens[1:]))
+        pairs = Counter(zip(tokens, tokens[1:], strict=False))
         if not pairs:
             break
         best = max(pairs, key=pairs.get)

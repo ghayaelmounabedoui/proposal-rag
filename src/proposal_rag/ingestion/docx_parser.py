@@ -2,11 +2,10 @@ import re
 from pathlib import Path
 
 from docx import Document
-from docx.text.paragraph import Paragraph
 from docx.table import Table
+from docx.text.paragraph import Paragraph
 
 from proposal_rag.models import DocumentBlock
-
 
 HEADING_PATTERN = re.compile(
     r"^(?:Heading|Titre)\s*([1-9])$",
