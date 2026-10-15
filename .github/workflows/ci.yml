@@ -28,7 +28,17 @@ jobs:
 
       # Les tests utilisent des faux modèles : aucune clé ni accès réseau requis.
       - name: Tests
-        run: pytest -q
+        run: pytest -q --cov=src/proposal_rag --cov=api --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+
+      # Cherche des vulnérabilités connues dans les paquets installés (y compris transitifs).
+      - name: Dependency audit
+        run: pip-audit
 
   docker:
     runs-on: ubuntu-latest

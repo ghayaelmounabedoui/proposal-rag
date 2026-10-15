@@ -23,3 +23,8 @@ data/raw/*
 
 # Config de production locale (copie de Caddyfile.example, contient un hash de mot de passe)
 Caddyfile
+
+# Couverture de tests
+.coverage
+coverage.xml
+htmlcov/
