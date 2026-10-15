@@ -6,7 +6,6 @@ from proposal_rag.generation.context import ContextBuilder
 from proposal_rag.generation.llm import LLM
 from proposal_rag.retrieval.pipeline import RetrievalPipeline
 
-
 SYSTEM_PROMPT = """
 You are an RFP compliance analyst.
 
