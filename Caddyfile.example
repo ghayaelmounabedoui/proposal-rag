@@ -1,0 +1,18 @@
+# Copier en "Caddyfile" puis remplacer le hash (voir README, section Déploiement).
+#   cp Caddyfile.example Caddyfile
+#
+# {$DOMAIN} vient du fichier .env (ex. DOMAIN=rfp.mondomaine.com).
+# Pour répéter en local sans domaine : DOMAIN=localhost
+
+{$DOMAIN} {
+	# Mot de passe demandé avant d'afficher quoi que ce soit.
+	# Générer le hash :
+	#   docker run --rm caddy:2 caddy hash-password --plaintext 'UnMotDePasseLong'
+	# Une ligne par utilisateur : <identifiant> <hash>
+	basic_auth {
+		admin REMPLACER_PAR_LE_HASH
+	}
+
+	# Tout le trafic est transmis à l'interface. L'API (port 8000) n'est jamais exposée.
+	reverse_proxy frontend:8501
+}

@@ -1,0 +1,25 @@
+# Environnement et secrets
+.venv/
+.env
+.env.*
+!.env.example
+
+# Fichiers générés par Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Index locaux
+var/
+
+# Journaux
+*.log
+
+# Documents internes (les exemples fictifs sont dans data/samples)
+data/raw/*
+!data/raw/.gitkeep
+
+# Config de production locale (copie de Caddyfile.example, contient un hash de mot de passe)
+Caddyfile

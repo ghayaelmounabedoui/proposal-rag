@@ -1,0 +1,42 @@
+[
+  {
+    "question": "Comment les données sont-elles chiffrées au repos ?",
+    "expected_source": "security.md"
+  },
+  {
+    "question": "Quelle version de TLS est utilisée pour les communications ?",
+    "expected_source": "security.md"
+  },
+  {
+    "question": "Combien de temps les sauvegardes sont-elles conservées ?",
+    "expected_source": "security.md"
+  },
+  {
+    "question": "Une authentification multifacteur est-elle exigée pour les accès privilégiés ?",
+    "expected_source": "security.md"
+  },
+  {
+    "question": "Is there a REST API for customer management?",
+    "expected_source": "api_platform.md"
+  },
+  {
+    "question": "Can orders be searched by order ID?",
+    "expected_source": "api_platform.md"
+  },
+  {
+    "question": "Quel est l'engagement de disponibilité mensuelle ?",
+    "expected_source": "operations_sla.md"
+  },
+  {
+    "question": "Quel est l'objectif de temps de reprise après sinistre ?",
+    "expected_source": "operations_sla.md"
+  },
+  {
+    "question": "Is an administrator guide provided?",
+    "expected_source": "documentation.md"
+  },
+  {
+    "question": "Quelle formation est proposée aux équipes ?",
+    "expected_source": "documentation.md"
+  }
+]
