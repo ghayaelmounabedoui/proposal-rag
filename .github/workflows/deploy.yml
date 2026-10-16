@@ -43,20 +43,23 @@ jobs:
       - name: Deploy backend
         run: |
           az containerapp update \
-            --subscription "$SUBSCRIPTION_ID"             --name ca-backend \
+            --subscription "$SUBSCRIPTION_ID" \
+            --name ca-backend \
             --resource-group "$RESOURCE_GROUP" \
             --image "${IMAGE_PREFIX}-backend:${{ inputs.image_tag }}"
 
       - name: Deploy frontend
         run: |
           az containerapp update \
-            --subscription "$SUBSCRIPTION_ID"             --name ca-frontend \
+            --subscription "$SUBSCRIPTION_ID" \
+            --name ca-frontend \
             --resource-group "$RESOURCE_GROUP" \
             --image "${IMAGE_PREFIX}-frontend:${{ inputs.image_tag }}"
 
       - name: Show deployed images
         run: |
           for app in ca-backend ca-frontend; do
-            az containerapp show --subscription "$SUBSCRIPTION_ID" --name "$app" --resource-group "$RESOURCE_GROUP" \
+            az containerapp show --subscription "$SUBSCRIPTION_ID" \
+            --name "$app" --resource-group "$RESOURCE_GROUP" \
               --query "{app:name, image:properties.template.containers[0].image, etat:properties.provisioningState}" -o table
           done
