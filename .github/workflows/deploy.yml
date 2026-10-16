@@ -1,0 +1,59 @@
+name: Deploy
+
+# Déploiement manuel d'une version déjà publiée par la CI vers Azure Container Apps.
+# Il faut que l'infrastructure existe (terraform apply) ; sinon le job échoue proprement.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Tag des images à déployer (ex. sha-<commit complet>)"
+        required: true
+        type: string
+
+permissions:
+  id-token: write # nécessaire à la connexion OIDC à Azure
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  RESOURCE_GROUP: rg-proposalrag-dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Environnement GitHub avec relecteur obligatoire : l'approbation se fait ici.
+    environment: production
+    steps:
+      - name: Log in to Azure (OIDC, no password)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Compute image prefix
+        run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - name: Deploy backend
+        run: |
+          az containerapp update \
+            --name ca-backend \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "${IMAGE_PREFIX}-backend:${{ inputs.image_tag }}"
+
+      - name: Deploy frontend
+        run: |
+          az containerapp update \
+            --name ca-frontend \
+            --resource-group "$RESOURCE_GROUP" \
+            --image "${IMAGE_PREFIX}-frontend:${{ inputs.image_tag }}"
+
+      - name: Show deployed images
+        run: |
+          for app in ca-backend ca-frontend; do
+            az containerapp show --name "$app" --resource-group "$RESOURCE_GROUP" \
+              --query "{app:name, image:properties.template.containers[0].image, etat:properties.provisioningState}" -o table
+          done
