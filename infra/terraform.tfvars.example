@@ -1,0 +1,9 @@
+# Copier en terraform.tfvars (ignoré par git) et renseigner. Ne jamais committer ce dernier.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+
+image_prefix  = "ghcr.io/utilisateur/proposal-rag"
+image_tag     = "sha-..."
+
+allowed_ip   = "203.0.113.7"
+groq_api_key = "..."
+api_key      = "..."
