@@ -43,6 +43,8 @@ jobs:
           context: .
           file: Dockerfile.backend
           push: false
+          load: true
+          tags: proposal-rag-backend:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -52,8 +54,32 @@ jobs:
           context: .
           file: Dockerfile.frontend
           push: false
+          load: true
+          tags: proposal-rag-frontend:scan
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Trivy cherche des failles connues dans les paquets de chaque image.
+      # Version épinglée par son empreinte : l'outil ne peut pas changer à notre insu.
+      - name: Scan images for vulnerabilities (report)
+        env:
+          TRIVY: aquasec/trivy@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436
+        run: |
+          for img in backend frontend; do
+            echo "::group::Trivy - $img (HIGH et CRITICAL, correctif disponible)"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image               --severity HIGH,CRITICAL --ignore-unfixed --format table "proposal-rag-$img:scan"               | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "::endgroup::"
+          done
+
+      # Garde-fou : passer SCAN_EXIT_CODE à "1" fait échouer la CI s'il reste une faille CRITIQUE corrigeable.
+      - name: Scan images for vulnerabilities (gate)
+        env:
+          TRIVY: aquasec/trivy@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436
+          SCAN_EXIT_CODE: "0"
+        run: |
+          for img in backend frontend; do
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image               --severity CRITICAL --ignore-unfixed --exit-code "$SCAN_EXIT_CODE" --quiet "proposal-rag-$img:scan"
+          done
 
   # Publie les images dans GHCR (registre de GitHub), uniquement après un merge sur main.
   # Chaque image est taguée avec le SHA du commit : on sait exactement ce qui tourne
