@@ -1,8 +1,14 @@
 name: Deploy
 
-# Déploiement manuel d'une version déjà publiée par la CI vers Azure Container Apps.
-# Il faut que l'infrastructure existe (terraform apply) ; sinon le job échoue proprement.
+# Déploie vers Azure Container Apps une version déjà publiée par la CI.
+#  - Automatique : quand la CI de main se termine avec succès (images publiées), après approbation.
+#  - Manuel : Run workflow avec un tag précis (utile pour un retour en arrière).
+# Si l'infrastructure n'existe pas (terraform destroy), le déploiement est ignoré sans erreur.
 on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -21,10 +27,14 @@ concurrency:
 env:
   RESOURCE_GROUP: rg-proposalrag-dev
   SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  # Manuel : le tag saisi. Automatique : le commit dont la CI vient de réussir.
+  IMAGE_TAG: ${{ inputs.image_tag || format('sha-{0}', github.event.workflow_run.head_sha) }}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Ne rien déployer si la CI a échoué.
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     # Environnement GitHub avec relecteur obligatoire : l'approbation se fait ici.
     environment: production
     steps:
@@ -37,29 +47,43 @@ jobs:
           # L'identité n'a de droits que sur un groupe de ressources, pas sur l'abonnement entier.
           allow-no-subscriptions: true
 
+      - name: Check that the infrastructure exists
+        id: infra
+        run: |
+          if az containerapp show --subscription "$SUBSCRIPTION_ID" --name ca-backend \
+               --resource-group "$RESOURCE_GROUP" --query name -o tsv > /dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Infrastructure absente (terraform destroy ?). Déploiement ignoré."
+          fi
+
       - name: Compute image prefix
+        if: steps.infra.outputs.exists == 'true'
         run: echo "IMAGE_PREFIX=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Deploy backend
+        if: steps.infra.outputs.exists == 'true'
         run: |
           az containerapp update \
             --subscription "$SUBSCRIPTION_ID" \
             --name ca-backend \
             --resource-group "$RESOURCE_GROUP" \
-            --image "${IMAGE_PREFIX}-backend:${{ inputs.image_tag }}"
+            --image "${IMAGE_PREFIX}-backend:${IMAGE_TAG}"
 
       - name: Deploy frontend
+        if: steps.infra.outputs.exists == 'true'
         run: |
           az containerapp update \
             --subscription "$SUBSCRIPTION_ID" \
             --name ca-frontend \
             --resource-group "$RESOURCE_GROUP" \
-            --image "${IMAGE_PREFIX}-frontend:${{ inputs.image_tag }}"
+            --image "${IMAGE_PREFIX}-frontend:${IMAGE_TAG}"
 
       - name: Show deployed images
+        if: steps.infra.outputs.exists == 'true'
         run: |
           for app in ca-backend ca-frontend; do
-            az containerapp show --subscription "$SUBSCRIPTION_ID" \
-            --name "$app" --resource-group "$RESOURCE_GROUP" \
+            az containerapp show --subscription "$SUBSCRIPTION_ID" --name "$app" --resource-group "$RESOURCE_GROUP" \
               --query "{app:name, image:properties.template.containers[0].image, etat:properties.provisioningState}" -o table
           done
