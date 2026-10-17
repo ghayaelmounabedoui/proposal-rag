@@ -48,3 +48,15 @@ variable "deploy_principal_id" {
   type        = string
   default     = ""
 }
+
+variable "data_resource_group" {
+  description = "Groupe de ressources du stockage persistant (créé hors Terraform, protégé par un verrou)."
+  type        = string
+  default     = "rg-proposalrag-data"
+}
+
+variable "data_storage_account" {
+  description = "Compte de stockage contenant les partages chroma et raw."
+  type        = string
+  default     = "dataprag46571"
+}

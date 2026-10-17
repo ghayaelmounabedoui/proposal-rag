@@ -22,6 +22,25 @@ resource "azurerm_container_app_environment" "main" {
   tags                = local.tags
 }
 
+# ---- Données persistantes -----------------------------------------------------
+# Le compte de stockage vit dans un autre groupe de ressources, hors de ce Terraform :
+# un terraform destroy ne le supprime donc pas (et un verrou l'en empêche).
+
+data "azurerm_storage_account" "data" {
+  name                = var.data_storage_account
+  resource_group_name = var.data_resource_group
+}
+
+resource "azurerm_container_app_environment_storage" "data" {
+  for_each                     = toset(["chroma", "raw"])
+  name                         = each.key
+  container_app_environment_id = azurerm_container_app_environment.main.id
+  account_name                 = data.azurerm_storage_account.data.name
+  share_name                   = each.key
+  access_key                   = data.azurerm_storage_account.data.primary_access_key
+  access_mode                  = "ReadWrite"
+}
+
 resource "azurerm_container_app" "backend" {
   name                         = "ca-backend"
   resource_group_name          = azurerm_resource_group.main.name
@@ -54,11 +73,32 @@ resource "azurerm_container_app" "backend" {
     min_replicas = 0 # 0 = aucun coût quand personne n'utilise l'application
     max_replicas = 1
 
+    # SQLite (utilisé par Chroma) sur un partage SMB : nobrl évite les erreurs de verrouillage.
+    # uid/gid 1000 = utilisateur "appuser" du conteneur.
+    dynamic "volume" {
+      for_each = azurerm_container_app_environment_storage.data
+      content {
+        name          = volume.key
+        storage_type  = "AzureFile"
+        storage_name  = volume.value.name
+        mount_options = "uid=1000,gid=1000,nobrl,mfsymlinks,cache=strict"
+      }
+    }
+
     container {
       name   = "backend"
       image  = local.backend_image
       cpu    = 1.0
       memory = "2Gi"
+
+      volume_mounts {
+        name = "chroma"
+        path = "/app/var/chroma"
+      }
+      volume_mounts {
+        name = "raw"
+        path = "/app/data/raw"
+      }
 
       env {
         name        = "GROQ_API_KEY"
