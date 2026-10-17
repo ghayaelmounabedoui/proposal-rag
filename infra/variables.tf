@@ -26,8 +26,9 @@ variable "image_tag" {
 }
 
 variable "allowed_ip" {
-  description = "Votre adresse IPv4 publique : seule autorisée à ouvrir le site (ex. 203.0.113.7)."
+  description = "Optionnel : restreindre l'accès à une IPv4 (ex. 203.0.113.7). Vide = pas de restriction (la connexion Entra ID protège le site)."
   type        = string
+  default     = ""
 }
 
 variable "groq_api_key" {
