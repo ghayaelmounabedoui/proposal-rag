@@ -16,11 +16,25 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 4.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
+    azapi = {
+      source  = "azure/azapi"
+      version = "~> 2.0"
+    }
   }
 }
 
 provider "azurerm" {
   features {}
   # Fourni par terraform.tfvars (ignoré par git) : pas d'identifiant dans le code.
+  subscription_id = var.subscription_id
+}
+
+provider "azuread" {}
+
+provider "azapi" {
   subscription_id = var.subscription_id
 }

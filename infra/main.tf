@@ -100,17 +100,24 @@ resource "azurerm_container_app" "frontend" {
     name  = "api-key"
     value = var.api_key
   }
+  secret {
+    name  = "aad-client-secret"
+    value = azuread_application_password.frontend.value
+  }
 
   ingress {
     external_enabled = true
     target_port      = 8501
     transport        = "http"
 
-    # Pas d'authentification applicative pour l'instant : accès limité à votre IP.
-    ip_security_restriction {
-      name             = "mon-ip"
-      action           = "Allow"
-      ip_address_range = "${var.allowed_ip}/32"
+    # Restriction par IP facultative, en plus de la connexion Entra ID.
+    dynamic "ip_security_restriction" {
+      for_each = var.allowed_ip == "" ? [] : [var.allowed_ip]
+      content {
+        name             = "mon-ip"
+        action           = "Allow"
+        ip_address_range = "${ip_security_restriction.value}/32"
+      }
     }
 
     traffic_weight {
@@ -148,4 +155,79 @@ resource "azurerm_role_assignment" "ci_deploy" {
   scope                = azurerm_resource_group.main.id
   role_definition_name = "Contributor"
   principal_id         = var.deploy_principal_id
+}
+
+# ---- Connexion par compte (Microsoft Entra ID) --------------------------------
+
+data "azuread_client_config" "current" {}
+
+locals {
+  # Adresse du frontend, calculable avant sa création (nom de l'app + domaine de l'environnement).
+  frontend_fqdn = "ca-frontend.${azurerm_container_app_environment.main.default_domain}"
+}
+
+resource "azuread_application" "frontend" {
+  display_name     = "proposal-rag-frontend"
+  sign_in_audience = "AzureADMyOrg" # uniquement les comptes de votre annuaire
+  owners           = [data.azuread_client_config.current.object_id]
+
+  web {
+    redirect_uris = ["https://${local.frontend_fqdn}/.auth/login/aad/callback"]
+    implicit_grant {
+      id_token_issuance_enabled = true
+    }
+  }
+}
+
+resource "azuread_service_principal" "frontend" {
+  client_id                    = azuread_application.frontend.client_id
+  app_role_assignment_required = true # seuls les utilisateurs affectés peuvent se connecter
+  owners                       = [data.azuread_client_config.current.object_id]
+}
+
+# Vous, utilisateur autorisé (rôle par défaut "User").
+resource "azuread_app_role_assignment" "me" {
+  app_role_id         = "00000000-0000-0000-0000-000000000000"
+  principal_object_id = data.azuread_client_config.current.object_id
+  resource_object_id  = azuread_service_principal.frontend.object_id
+}
+
+resource "azuread_application_password" "frontend" {
+  application_id = azuread_application.frontend.id
+  display_name   = "container-apps-auth"
+  end_date       = timeadd(timestamp(), "2160h") # ~90 jours
+
+  lifecycle {
+    ignore_changes = [end_date] # ne pas régénérer le secret à chaque plan
+  }
+}
+
+# Active la connexion Entra ID devant le frontend (aucun code à modifier dans l'application).
+resource "azapi_resource" "frontend_auth" {
+  type      = "Microsoft.App/containerApps/authConfigs@2024-03-01"
+  name      = "current"
+  parent_id = azurerm_container_app.frontend.id
+
+  body = {
+    properties = {
+      platform = { enabled = true }
+      globalValidation = {
+        unauthenticatedClientAction = "RedirectToLoginPage"
+        redirectToProvider          = "azureactivedirectory"
+      }
+      identityProviders = {
+        azureActiveDirectory = {
+          enabled = true
+          registration = {
+            openIdIssuer            = "https://login.microsoftonline.com/${data.azuread_client_config.current.tenant_id}/v2.0"
+            clientId                = azuread_application.frontend.client_id
+            clientSecretSettingName = "aad-client-secret"
+          }
+        }
+      }
+      login = { preserveUrlFragmentsForLogins = false }
+    }
+  }
+
+  depends_on = [azuread_app_role_assignment.me]
 }
