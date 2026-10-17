@@ -28,23 +28,6 @@ jobs:
     # Environnement GitHub avec relecteur obligatoire : l'approbation se fait ici.
     environment: production
     steps:
-      - name: Diagnose OIDC (temporary)
-        env:
-          CID: ${{ secrets.AZURE_CLIENT_ID }}
-          TID: ${{ secrets.AZURE_TENANT_ID }}
-          SID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        run: |
-          # Longueurs attendues : 36 caractères (un UUID). Autre valeur = espace ou retour à la ligne en trop.
-          echo "client-id length=${#CID} tenant-id length=${#TID} subscription-id length=${#SID}"
-          echo "client-id empty? $([ -z "$CID" ] && echo YES || echo no)"
-          # Identité que GitHub présente à Azure (ni secret ni jeton affichés).
-          TOKEN=$(curl -s -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" | python3 -c "import sys,json;print(json.load(sys.stdin)['value'])")
-          echo "$TOKEN" | python3 -c "
-          import sys,json,base64
-          p=sys.stdin.read().split('.')[1]
-          c=json.loads(base64.urlsafe_b64decode(p+'='*(-len(p)%4)))
-          print({k:c.get(k) for k in ('sub','aud','iss')})"
-
       - name: Log in to Azure (OIDC, no password)
         uses: azure/login@v2
         with:
