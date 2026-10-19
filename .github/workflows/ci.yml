@@ -67,15 +67,16 @@ jobs:
         run: |
           for img in backend frontend; do
             echo "::group::Trivy - $img (HIGH et CRITICAL, correctif disponible)"
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image               --severity HIGH,CRITICAL --ignore-unfixed --format table "proposal-rag-$img:scan"               | tee -a "$GITHUB_STEP_SUMMARY"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image               --scanners vuln,secret --severity HIGH,CRITICAL --ignore-unfixed --format table "proposal-rag-$img:scan"               | tee -a "$GITHUB_STEP_SUMMARY"
             echo "::endgroup::"
           done
 
-      # Garde-fou : passer SCAN_EXIT_CODE à "1" fait échouer la CI s'il reste une faille CRITIQUE corrigeable.
+      # Garde-fou ACTIF : la CI échoue s'il reste une faille CRITIQUE pour laquelle un correctif existe.
+      # (Mettre SCAN_EXIT_CODE à "0" pour repasser en simple rapport.)
       - name: Scan images for vulnerabilities (gate)
         env:
           TRIVY: aquasec/trivy@sha256:a22415a38938a56c379387a8163fcb0ce38b10ace73e593475d3658d578b2436
-          SCAN_EXIT_CODE: "0"
+          SCAN_EXIT_CODE: "1"
         run: |
           for img in backend frontend; do
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock "$TRIVY" image               --severity CRITICAL --ignore-unfixed --exit-code "$SCAN_EXIT_CODE" --quiet "proposal-rag-$img:scan"
