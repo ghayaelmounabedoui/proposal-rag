@@ -41,6 +41,35 @@ resource "azurerm_container_app_environment_storage" "data" {
   access_mode                  = "ReadWrite"
 }
 
+# ---- Secrets dans Key Vault ---------------------------------------------------
+# Les clés (Groq, API_KEY) ne passent plus par Terraform : les applications les lisent
+# directement dans le coffre avec leur identité.
+
+data "azurerm_key_vault" "main" {
+  name                = var.key_vault_name
+  resource_group_name = var.data_resource_group
+}
+
+resource "azurerm_user_assigned_identity" "apps" {
+  name                = "id-${var.name_prefix}-apps"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  tags                = local.tags
+}
+
+# Lecture seule des secrets (pas d'écriture, pas de gestion du coffre).
+resource "azurerm_role_assignment" "apps_read_secrets" {
+  scope                = data.azurerm_key_vault.main.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.apps.principal_id
+}
+
+locals {
+  # Adresses sans version : l'application prend toujours la dernière valeur du secret.
+  kv_groq_secret_id = "${data.azurerm_key_vault.main.vault_uri}secrets/groq-api-key"
+  kv_api_secret_id  = "${data.azurerm_key_vault.main.vault_uri}secrets/api-key"
+}
+
 resource "azurerm_container_app" "backend" {
   name                         = "ca-backend"
   resource_group_name          = azurerm_resource_group.main.name
@@ -48,14 +77,20 @@ resource "azurerm_container_app" "backend" {
   revision_mode                = "Single"
   tags                         = local.tags
 
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.apps.id]
+  }
 
   secret {
-    name  = "groq-api-key"
-    value = var.groq_api_key
+    name                = "groq-api-key"
+    key_vault_secret_id = local.kv_groq_secret_id
+    identity            = azurerm_user_assigned_identity.apps.id
   }
   secret {
-    name  = "api-key"
-    value = var.api_key
+    name                = "api-key"
+    key_vault_secret_id = local.kv_api_secret_id
+    identity            = azurerm_user_assigned_identity.apps.id
   }
 
   # Interne : joignable seulement depuis le frontend, jamais depuis Internet.
@@ -68,6 +103,8 @@ resource "azurerm_container_app" "backend" {
       percentage      = 100
     }
   }
+
+  depends_on = [azurerm_role_assignment.apps_read_secrets]
 
   template {
     min_replicas = 0 # 0 = aucun coût quand personne n'utilise l'application
@@ -135,10 +172,16 @@ resource "azurerm_container_app" "frontend" {
   revision_mode                = "Single"
   tags                         = local.tags
 
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.apps.id]
+  }
+
 
   secret {
-    name  = "api-key"
-    value = var.api_key
+    name                = "api-key"
+    key_vault_secret_id = local.kv_api_secret_id
+    identity            = azurerm_user_assigned_identity.apps.id
   }
   secret {
     name  = "aad-client-secret"
@@ -165,6 +208,8 @@ resource "azurerm_container_app" "frontend" {
       percentage      = 100
     }
   }
+
+  depends_on = [azurerm_role_assignment.apps_read_secrets]
 
   template {
     min_replicas = 0

@@ -31,18 +31,6 @@ variable "allowed_ip" {
   default     = ""
 }
 
-variable "groq_api_key" {
-  description = "Clé Groq."
-  type        = string
-  sensitive   = true
-}
-
-variable "api_key" {
-  description = "Clé partagée frontend -> backend (X-API-Key)."
-  type        = string
-  sensitive   = true
-}
-
 variable "deploy_principal_id" {
   description = "Object ID du principal de service utilisé par GitHub Actions (vide = aucun droit de déploiement créé)."
   type        = string
@@ -59,4 +47,10 @@ variable "data_storage_account" {
   description = "Compte de stockage contenant les partages chroma et raw."
   type        = string
   default     = "dataprag46571"
+}
+
+variable "key_vault_name" {
+  description = "Key Vault contenant les secrets groq-api-key et api-key (créé hors Terraform, dans le groupe de données)."
+  type        = string
+  default     = "kv-prag-30420"
 }
