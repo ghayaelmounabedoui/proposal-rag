@@ -179,6 +179,12 @@ resource "azurerm_container_app" "backend" {
     }
   }
 
+  # La version des images est gérée par la CI (workflow Deploy), pas par Terraform :
+  # sans cela, chaque apply ferait revenir les applications à l'image de terraform.tfvars.
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
+  }
+
   template {
     min_replicas = 0 # 0 = aucun coût quand personne n'utilise l'application
     max_replicas = 1
@@ -280,6 +286,12 @@ resource "azurerm_container_app" "frontend" {
       latest_revision = true
       percentage      = 100
     }
+  }
+
+  # La version des images est gérée par la CI (workflow Deploy), pas par Terraform :
+  # sans cela, chaque apply ferait revenir les applications à l'image de terraform.tfvars.
+  lifecycle {
+    ignore_changes = [template[0].container[0].image]
   }
 
   template {
