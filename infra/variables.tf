@@ -54,3 +54,14 @@ variable "key_vault_name" {
   type        = string
   default     = "kv-prag-30420"
 }
+
+variable "alert_email" {
+  description = "Adresse qui reçoit les alertes de supervision."
+  type        = string
+}
+
+variable "apps_identity_name" {
+  description = "Identité managée des applications (créée hors Terraform, avec accès en lecture au Key Vault)."
+  type        = string
+  default     = "id-prag-apps"
+}

@@ -15,11 +15,92 @@ resource "azurerm_resource_group" "main" {
 }
 
 # Pas de Log Analytics ni de registre Azure : les images viennent de GHCR (coût fixe ~0 EUR).
-resource "azurerm_container_app_environment" "main" {
-  name                = "cae-${var.name_prefix}-dev"
+# ---- Supervision ----------------------------------------------------------------
+# Les logs des conteneurs sont envoyés dans Log Analytics. Le plafond quotidien limite la
+# facture : au-delà, l'envoi de logs s'arrête jusqu'au lendemain (les applications continuent).
+resource "azurerm_log_analytics_workspace" "main" {
+  name                = "log-${var.name_prefix}-dev"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+  daily_quota_gb      = 0.1
   tags                = local.tags
+}
+
+resource "azurerm_container_app_environment" "main" {
+  name                       = "cae-${var.name_prefix}-dev"
+  resource_group_name        = azurerm_resource_group.main.name
+  location                   = azurerm_resource_group.main.location
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.main.id
+  tags                       = local.tags
+}
+
+resource "azurerm_monitor_action_group" "main" {
+  name                = "ag-${var.name_prefix}-alerts"
+  resource_group_name = azurerm_resource_group.main.name
+  short_name          = "ragalerts"
+  tags                = local.tags
+
+  email_receiver {
+    name                    = "owner"
+    email_address           = var.alert_email
+    use_common_alert_schema = true
+  }
+}
+
+# Le backend redémarre en boucle (plantage, manque de mémoire...).
+resource "azurerm_monitor_metric_alert" "backend_restarts" {
+  name                = "alert-backend-restarts"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_container_app.backend.id]
+  description         = "Plus de 3 redémarrages du backend en 15 minutes."
+  severity            = 2
+  frequency           = "PT5M"
+  window_size         = "PT15M"
+  tags                = local.tags
+
+  criteria {
+    metric_namespace = "Microsoft.App/containerApps"
+    metric_name      = "RestartCount"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 3
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.main.id
+  }
+}
+
+# Le site renvoie des erreurs serveur (5xx).
+resource "azurerm_monitor_metric_alert" "frontend_errors" {
+  name                = "alert-frontend-5xx"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_container_app.frontend.id]
+  description         = "Plus de 5 erreurs 5xx sur le site en 15 minutes."
+  severity            = 2
+  frequency           = "PT5M"
+  window_size         = "PT15M"
+  tags                = local.tags
+
+  criteria {
+    metric_namespace = "Microsoft.App/containerApps"
+    metric_name      = "Requests"
+    aggregation      = "Total"
+    operator         = "GreaterThan"
+    threshold        = 5
+
+    dimension {
+      name     = "StatusCodeCategory"
+      operator = "Include"
+      values   = ["5xx"]
+    }
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.main.id
+  }
 }
 
 # ---- Données persistantes -----------------------------------------------------
@@ -50,18 +131,12 @@ data "azurerm_key_vault" "main" {
   resource_group_name = var.data_resource_group
 }
 
-resource "azurerm_user_assigned_identity" "apps" {
-  name                = "id-${var.name_prefix}-apps"
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  tags                = local.tags
-}
-
-# Lecture seule des secrets (pas d'écriture, pas de gestion du coffre).
-resource "azurerm_role_assignment" "apps_read_secrets" {
-  scope                = data.azurerm_key_vault.main.id
-  role_definition_name = "Key Vault Secrets User"
-  principal_id         = azurerm_user_assigned_identity.apps.principal_id
+# Identité permanente, créée une fois hors Terraform dans le groupe protégé, avec son droit
+# "Key Vault Secrets User" (lecture seule des secrets). Terraform ne fait que la lire :
+# rien à supprimer dans un groupe verrouillé lors d'un terraform destroy.
+data "azurerm_user_assigned_identity" "apps" {
+  name                = var.apps_identity_name
+  resource_group_name = var.data_resource_group
 }
 
 locals {
@@ -79,18 +154,18 @@ resource "azurerm_container_app" "backend" {
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.apps.id]
+    identity_ids = [data.azurerm_user_assigned_identity.apps.id]
   }
 
   secret {
     name                = "groq-api-key"
     key_vault_secret_id = local.kv_groq_secret_id
-    identity            = azurerm_user_assigned_identity.apps.id
+    identity            = data.azurerm_user_assigned_identity.apps.id
   }
   secret {
     name                = "api-key"
     key_vault_secret_id = local.kv_api_secret_id
-    identity            = azurerm_user_assigned_identity.apps.id
+    identity            = data.azurerm_user_assigned_identity.apps.id
   }
 
   # Interne : joignable seulement depuis le frontend, jamais depuis Internet.
@@ -103,8 +178,6 @@ resource "azurerm_container_app" "backend" {
       percentage      = 100
     }
   }
-
-  depends_on = [azurerm_role_assignment.apps_read_secrets]
 
   template {
     min_replicas = 0 # 0 = aucun coût quand personne n'utilise l'application
@@ -174,14 +247,14 @@ resource "azurerm_container_app" "frontend" {
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.apps.id]
+    identity_ids = [data.azurerm_user_assigned_identity.apps.id]
   }
 
 
   secret {
     name                = "api-key"
     key_vault_secret_id = local.kv_api_secret_id
-    identity            = azurerm_user_assigned_identity.apps.id
+    identity            = data.azurerm_user_assigned_identity.apps.id
   }
   secret {
     name  = "aad-client-secret"
@@ -208,8 +281,6 @@ resource "azurerm_container_app" "frontend" {
       percentage      = 100
     }
   }
-
-  depends_on = [azurerm_role_assignment.apps_read_secrets]
 
   template {
     min_replicas = 0
